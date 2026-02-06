@@ -1,10 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { User, UserProgress, Module, Broadcast } from '../types';
 import { APP_MODULES } from '../data/mockData';
 import Icon from '../components/Icon';
 import { Haptics } from '../utils/haptics';
 import { AIService } from '../services/aiService';
+import { supabase } from '../services/supabaseClient';
 
 interface Props {
   user: User;
@@ -17,10 +18,47 @@ interface Props {
 
 const DashboardScreen: React.FC<Props> = ({ user, progress, broadcast, onClearBroadcast, onOpenArchive, onSelectModule }) => {
   const [recommendation, setRecommendation] = useState<{module: string, text: string} | null>(null);
+  const [dbXP, setDbXP] = useState<number | null>(null);
+
+  // Sincronização em tempo real com o banco de dados para XP
+  useEffect(() => {
+    const fetchInitialXP = async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('xp_total')
+        .eq('id', user.id)
+        .single();
+      
+      if (!error && data) setDbXP(data.xp_total);
+    };
+
+    fetchInitialXP();
+
+    // Ouvinte Real-time para mudanças no perfil (especialmente XP vindo do Edge Function)
+    const channel = supabase
+      .channel(`profile-updates-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${user.id}`,
+        },
+        (payload) => {
+          setDbXP(payload.new.xp_total);
+          Haptics.reward(); // Feedback tátil quando o XP sobe remotamente
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user.id]);
 
   useEffect(() => {
     const fetchRec = async () => {
-      // ML: Preditivamente sugere o próximo passo baseado no histórico
       const rec = await AIService.getAdaptiveRecommendation(progress.completedLessons, 85);
       setRecommendation({
         module: rec.recommendedModule,
@@ -33,6 +71,9 @@ const DashboardScreen: React.FC<Props> = ({ user, progress, broadcast, onClearBr
   const recommendedModule = APP_MODULES.find(m => m.id === user.favoriteModule) || APP_MODULES[0];
   const aiModule = APP_MODULES.find(m => m.id === recommendation?.module) || recommendedModule;
 
+  // Usa o XP do DB se disponível, senão usa os pontos locais
+  const displayXP = dbXP !== null ? dbXP : progress.totalPoints;
+
   return (
     <div className="flex-1 overflow-y-auto px-6 py-10 bg-[#020617] relative pb-32 scrollbar-hide">
       <div className="scanline opacity-10"></div>
@@ -44,7 +85,7 @@ const DashboardScreen: React.FC<Props> = ({ user, progress, broadcast, onClearBr
            </div>
            <div>
              <h1 className="text-xl font-black text-white tracking-tighter uppercase leading-none">Agente {user.name.split(' ')[0]}</h1>
-             <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest mt-1">Status: Conectado • Nível {user.level}</p>
+             <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest mt-1">Status: Sincronizado • Nível {user.level}</p>
            </div>
         </div>
         <button 
@@ -55,7 +96,6 @@ const DashboardScreen: React.FC<Props> = ({ user, progress, broadcast, onClearBr
         </button>
       </header>
 
-      {/* Card de Recomendação Neural Link */}
       {recommendation && (
         <button 
           onClick={() => onSelectModule(aiModule)}
@@ -66,7 +106,7 @@ const DashboardScreen: React.FC<Props> = ({ user, progress, broadcast, onClearBr
               <Icon name="zap" size={20} />
            </div>
            <div className="text-left">
-              <span className="text-[7px] font-black text-indigo-400 uppercase tracking-[0.4em] block mb-1">Neural Recommendation</span>
+              <span className="text-[7px] font-black text-indigo-400 uppercase tracking-[0.4em] block mb-1">Recomendação Neural</span>
               <h4 className="text-xs font-black text-white uppercase tracking-tight mb-1">{recommendation.text}</h4>
               <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Aceder: {aiModule.title}</p>
            </div>
@@ -104,14 +144,14 @@ const DashboardScreen: React.FC<Props> = ({ user, progress, broadcast, onClearBr
       </button>
 
       <div className="grid grid-cols-2 gap-4 animate-reveal delay-2">
-        <div className="p-6 bg-slate-900/40 border border-slate-800 rounded-[2rem] flex flex-col items-center gap-2">
+        <div className="p-6 bg-slate-900/40 border border-slate-800 rounded-[2rem] flex flex-col items-center gap-2 shadow-2xl">
            <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center mb-1">
               <Icon name="zap" size={20} className="text-amber-500" />
            </div>
-           <span className="text-2xl font-black text-white tabular-nums">{progress.totalPoints}</span>
-           <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">XP</span>
+           <span className="text-2xl font-black text-white tabular-nums animate-pulse">{displayXP}</span>
+           <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">XP Total</span>
         </div>
-        <div className="p-6 bg-slate-900/40 border border-slate-800 rounded-[2rem] flex flex-col items-center gap-2">
+        <div className="p-6 bg-slate-900/40 border border-slate-800 rounded-[2rem] flex flex-col items-center gap-2 shadow-2xl">
            <div className="w-10 h-10 rounded-full bg-rose-500/10 flex items-center justify-center mb-1">
               <Icon name="award" size={20} className="text-rose-500" />
            </div>

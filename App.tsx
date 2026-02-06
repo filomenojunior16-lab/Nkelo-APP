@@ -20,6 +20,7 @@ import ExplorationScreen from './screens/ExplorationScreen';
 import AdminDashboardScreen from './screens/AdminDashboardScreen';
 import Icon from './components/Icon';
 import { Haptics } from './utils/haptics';
+import { DataService } from './services/supabaseClient';
 
 const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -51,57 +52,18 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (user) {
-      localStorage.setItem('nkelo_user', JSON.stringify(user));
+    if (user && progress) {
       localStorage.setItem('nkelo_progress', JSON.stringify(progress));
+      DataService.saveProgress(user.id, progress);
     }
-  }, [user, progress]);
+  }, [progress, user]);
 
-  // Handler centralizado e robusto para evitar ecrãs pretos
   const navigateToHome = useCallback(() => {
     setView('home');
     setSelectedModule(null);
     setSelectedLesson(null);
     setActiveQuizzes([]);
-    // Garante que o scroll volta ao topo e estados modais são limpos
   }, []);
-
-  const handleLogout = () => {
-    Haptics.error();
-    localStorage.removeItem('nkelo_user');
-    localStorage.removeItem('nkelo_progress');
-    setUser(null);
-    setView('home');
-    setActiveTab('dashboard');
-  };
-
-  const handleSwitchAccount = () => {
-    Haptics.medium();
-    // Simplesmente desloga o utilizador atual mas mantém dados em cache para o AuthScreen sugerir
-    setUser(null);
-    setView('home');
-    setActiveTab('dashboard');
-  };
-
-  if (loading) return <SplashScreen />;
-  if (!onboarded) return <OnboardingScreen onFinish={() => { setOnboarded(true); localStorage.setItem('nkelo_onboarded', 'true'); }} />;
-  
-  if (!user) return (
-    <AuthScreen onLogin={(name, email, fav, role) => {
-      const newUser: User = {
-        id: Math.random().toString(36).substr(2, 9),
-        name, email, role,
-        level: role === UserRole.ADMIN ? 99 : (role === UserRole.ENTUSIASTA ? 5 : 1),
-        rank: role === UserRole.ADMIN ? 'SUPER-USER' : (role === UserRole.ENTUSIASTA ? 'Explorador' : 'Aspirante'),
-        credits: role === UserRole.ADMIN ? 999999 : (role === UserRole.ENTUSIASTA ? 500 : 100),
-        favoriteModule: fav,
-        achievements: []
-      };
-      setUser(newUser);
-      setActiveTab(role === UserRole.ADMIN ? ('admin' as any) : 'dashboard');
-      setView('home');
-    }} />
-  );
 
   const handleTabChange = (tab: AppTab) => {
     Haptics.light();
@@ -116,130 +78,163 @@ const App: React.FC = () => {
     setView('module');
   };
 
+  if (loading) return <SplashScreen />;
+  if (!onboarded) return <OnboardingScreen onFinish={() => { setOnboarded(true); localStorage.setItem('nkelo_onboarded', 'true'); }} />;
+  
+  if (!user) return <AuthScreen onLogin={(name, email, fav, role) => {
+    // Gerador de UUID v4 simples para compatibilidade com o tipo UUID do Supabase RPC
+    const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+
+    const newUser: User = { 
+      id: uuid, 
+      name, 
+      email, 
+      role, 
+      level: 1, 
+      rank: role === UserRole.ADMIN ? 'Supervisor' : 'Aspirante', 
+      credits: 100, 
+      achievements: [], 
+      favoriteModule: fav 
+    };
+    setUser(newUser);
+    localStorage.setItem('nkelo_user', JSON.stringify(newUser));
+    setView('home');
+  }} />;
+
   const isAdmin = user.role === UserRole.ADMIN;
 
   const renderTabContent = () => {
-    if (isAdmin && activeTab !== 'profile') {
-      return <AdminDashboardScreen user={user} onSetBroadcast={setBroadcast} />;
+    if (isAdmin && activeTab === 'admin') {
+      return <AdminDashboardScreen user={user} onSetBroadcast={(b) => {
+        setBroadcast(b);
+        if (b) localStorage.setItem('nkelo_broadcast', JSON.stringify(b));
+        else localStorage.removeItem('nkelo_broadcast');
+      }} />;
     }
 
     switch (activeTab) {
-      case 'dashboard': return <DashboardScreen user={user} progress={progress} broadcast={broadcast} onClearBroadcast={() => setBroadcast(null)} onOpenArchive={() => setView('archive')} onSelectModule={(m) => openModule(m)} />;
-      case 'learn': return <LearnScreen onSelectModule={(m, mode) => openModule(m, mode)} progress={progress} user={user} />;
+      case 'dashboard': 
+        return (
+          <DashboardScreen 
+            user={user} 
+            progress={progress} 
+            broadcast={broadcast} 
+            onClearBroadcast={() => setBroadcast(null)} 
+            onOpenArchive={() => setView('archive')} 
+            onSelectModule={openModule} 
+          />
+        );
+      case 'learn': return <LearnScreen onSelectModule={openModule} progress={progress} user={user} />;
       case 'nexus': return <NexusScreen user={user} />;
       case 'worldcup': return <WorldcupScreen progress={progress} />;
-      case 'profile': return <ProfileScreen user={user} progress={progress} onLogout={handleLogout} onSwitchAccount={handleSwitchAccount} />;
-      default: return <DashboardScreen user={user} progress={progress} broadcast={broadcast} onClearBroadcast={() => setBroadcast(null)} onOpenArchive={() => setView('archive')} onSelectModule={(m) => openModule(m)} />;
+      case 'profile': 
+        return (
+          <ProfileScreen 
+            user={user} 
+            progress={progress} 
+            onLogout={() => { setUser(null); localStorage.removeItem('nkelo_user'); }} 
+            onSwitchAccount={() => { setUser(null); }} 
+          />
+        );
+      default: return null;
     }
   };
 
   return (
     <div className="h-[100dvh] w-full flex flex-col bg-[#020617] max-w-md mx-auto relative overflow-hidden shadow-2xl border-x border-slate-800">
-      <div className="flex-1 flex flex-col overflow-hidden relative">
+      <main className="flex-1 flex flex-col overflow-hidden relative z-10">
         {view === 'home' && renderTabContent()}
-        
         {view === 'module' && selectedModule && (
           <ModuleScreen 
             module={selectedModule} 
+            completedLessons={progress.completedLessons} 
             onBack={navigateToHome} 
             onSelectLesson={l => { setSelectedLesson(l); setView('lesson'); }} 
-            completedLessons={progress.completedLessons} 
           />
         )}
-        
         {view === 'lesson' && selectedLesson && selectedModule && (
           <LessonScreen 
             lesson={selectedLesson} 
             moduleColor={selectedModule.color} 
-            learningMode={activeLearningMode}
+            learningMode={activeLearningMode} 
             onBack={() => setView('module')} 
-            onStartQuiz={() => { setActiveQuizzes(selectedLesson.quizzes || []); setView('quiz'); }} 
+            onStartQuiz={() => { setActiveQuizzes(selectedLesson.quizzes); setView('quiz'); }} 
           />
         )}
-        
         {view === 'quiz' && selectedModule && (
           <QuizScreen 
-            quizzes={activeQuizzes.length > 0 ? activeQuizzes : (selectedLesson?.quizzes || [])} 
+            quizzes={activeQuizzes} 
             moduleColor={selectedModule.color} 
             userPoints={progress.totalPoints} 
-            onComplete={pts => { 
-              const newPoints = progress.totalPoints + pts;
-              const newCompleted = selectedLesson ? [...new Set([...progress.completedLessons, selectedLesson.id])] : progress.completedLessons;
-              setProgress(prev => ({ ...prev, totalPoints: newPoints, completedLessons: newCompleted })); 
+            onUpdateProgress={pts => setProgress(prev => ({ ...prev, totalPoints: pts }))}
+            onComplete={earnedPoints => { 
+              setProgress(prev => ({ 
+                ...prev, 
+                totalPoints: prev.totalPoints + earnedPoints, 
+                completedLessons: [...new Set([...prev.completedLessons, selectedLesson!.id])] 
+              })); 
               setView('reward'); 
             }} 
             onBack={() => setView('lesson')} 
-            onUpdateProgress={pts => setProgress(p => ({ ...p, totalPoints: pts }))} 
           />
         )}
-        
         {view === 'reward' && <RewardScreen onContinue={navigateToHome} />}
-        {view === 'ai-chat' && <AIChatScreen onBack={navigateToHome} />}
-        {view === 'explore' && <ExplorationScreen onBack={navigateToHome} />}
         {view === 'archive' && <ArchiveScreen onBack={navigateToHome} />}
+        {view === 'ai-chat' && <AIChatScreen onBack={navigateToHome} />}
+        {view === 'explore' && <ExplorationScreen user={user} onBack={navigateToHome} />}
+      </main>
 
-        {/* MECANISMO DE SEGURANÇA: Se o ecrã ficar preto por erro de estado, exibe o Fallback */}
-        {view !== 'home' && !selectedModule && !selectedLesson && view !== 'reward' && view !== 'ai-chat' && view !== 'explore' && view !== 'archive' && (
-           <div className="flex-1 flex flex-col items-center justify-center p-12 text-center bg-slate-950">
-             <div className="w-16 h-16 bg-rose-600/20 rounded-3xl flex items-center justify-center text-rose-500 mb-6">
-                <Icon name="shield" size={32} />
-             </div>
-             <h2 className="text-white font-black uppercase text-xs tracking-widest mb-2">Erro de Protocolo de Ecrã</h2>
-             <p className="text-slate-500 text-[10px] uppercase font-bold mb-8">A Triangulação de Vista falhou. O sistema vai resetar para o Dashboard.</p>
-             <button onClick={navigateToHome} className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl">Sincronizar Manualmente</button>
-           </div>
-        )}
-      </div>
-
-      <nav className="h-[calc(4.5rem+env(safe-area-inset-bottom))] bg-slate-950/95 backdrop-blur-3xl border-t border-slate-800/50 flex items-center justify-around px-2 z-[70] pb-[env(safe-area-inset-bottom)]">
-        {isAdmin ? (
-          <>
-            <button onClick={() => handleTabChange('admin' as any)} className={`flex-1 flex flex-col items-center gap-1 py-2 ${activeTab === 'admin' ? 'text-rose-400' : 'text-slate-600'}`}>
-              <Icon name="shield" size={20} />
-              <span className="text-[8px] font-black uppercase tracking-widest">Painel Admin</span>
-            </button>
-            <button onClick={() => handleTabChange('profile')} className={`flex-1 flex flex-col items-center gap-1 py-2 ${activeTab === 'profile' ? 'text-rose-400' : 'text-slate-600'}`}>
-              <Icon name="user" size={20} />
-              <span className="text-[8px] font-black uppercase tracking-widest">Perfil</span>
-            </button>
-          </>
-        ) : (
-          <>
-            {[
-              { id: 'dashboard', icon: 'home', label: 'Início' },
-              { id: 'nexus', icon: 'zap', label: 'Nexus' },
-              { id: 'learn', icon: 'grid', label: 'Missão', center: true },
-              { id: 'worldcup', icon: 'award', label: 'Arena' },
-              { id: 'profile', icon: 'user', label: 'Perfil' }
-            ].map(tab => (
-              tab.center ? (
-                <button 
-                  key={tab.id} 
-                  onClick={() => handleTabChange('learn')} 
-                  className={`w-14 h-14 -mt-10 rounded-[1.8rem] flex items-center justify-center transition-all shadow-2xl ${
-                    activeTab === 'learn' 
-                    ? 'bg-indigo-600 text-white scale-110 shadow-indigo-600/30 ring-4 ring-[#020617]' 
-                    : 'bg-slate-800 text-slate-400'
-                  }`}
-                >
+      {/* Navigation Bar */}
+      {view === 'home' && (
+        <nav className="h-[calc(4.5rem+env(safe-area-inset-bottom))] bg-slate-950/95 backdrop-blur-3xl border-t border-slate-800/50 flex items-center justify-around px-2 z-[999] pb-[env(safe-area-inset-bottom)]">
+          {[
+            { id: 'dashboard', icon: 'home', label: 'Início' },
+            { id: 'nexus', icon: 'zap', label: 'Nexus' },
+            { id: 'learn', icon: 'grid', label: 'Estudar', center: true },
+            { id: 'worldcup', icon: 'award', label: 'Arena' },
+            { id: isAdmin ? 'admin' : 'profile', icon: isAdmin ? 'shield' : 'user', label: isAdmin ? 'Kernel' : 'Perfil' }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => handleTabChange(tab.id as AppTab)}
+              className={`flex-1 flex flex-col items-center gap-1 transition-all py-2 ${tab.center ? '-mt-10' : ''} ${activeTab === tab.id ? 'text-indigo-400' : 'text-slate-600'}`}
+            >
+              {tab.center ? (
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-2xl ${activeTab === 'learn' ? 'bg-indigo-600 text-white shadow-indigo-600/40 ring-4 ring-[#020617]' : 'bg-slate-800 text-slate-500 shadow-xl'}`}>
                   <Icon name={tab.icon} size={24} />
-                </button>
+                </div>
               ) : (
-                <button 
-                  key={tab.id} 
-                  onClick={() => handleTabChange(tab.id as AppTab)} 
-                  className={`flex-1 flex flex-col items-center gap-1 transition-all py-2 active:scale-95 ${
-                    activeTab === tab.id ? 'text-indigo-400' : 'text-slate-600'
-                  }`}
-                >
+                <>
                   <Icon name={tab.icon} size={18} />
                   <span className="text-[7px] font-black uppercase tracking-widest">{tab.label}</span>
-                </button>
-              )
-            ))}
-          </>
-        )}
-      </nav>
+                </>
+              )}
+            </button>
+          ))}
+        </nav>
+      )}
+
+      {/* Quick AI Action Bubbles */}
+      {view === 'home' && activeTab === 'dashboard' && (
+        <div className="absolute bottom-24 right-6 flex flex-col gap-4 z-[50]">
+          <button 
+            onClick={() => { Haptics.medium(); setView('explore'); }}
+            className="w-12 h-12 bg-cyan-600 text-white rounded-full flex items-center justify-center shadow-lg border border-white/20 bouncy-btn"
+          >
+            <Icon name="globe" size={20} />
+          </button>
+          <button 
+            onClick={() => { Haptics.medium(); setView('ai-chat'); }}
+            className="w-14 h-14 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-xl border border-white/20 bouncy-btn"
+          >
+            <Icon name="rocket" size={24} />
+          </button>
+        </div>
+      )}
     </div>
   );
 };

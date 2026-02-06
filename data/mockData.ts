@@ -1,89 +1,106 @@
 
 import { Module, ModuleType, Difficulty, Quiz, InteractionType } from '../types';
 
+// DigitalBook interface for the archive system
+export interface DigitalBook {
+  id: string;
+  title: string;
+  category: string;
+  author: string;
+  icon: string;
+  levelRequired: number;
+  summary: string;
+  fullText: string;
+  isLegal?: boolean;
+}
+
 export const APP_MODULES: Module[] = [
   {
-    id: ModuleType.HISTORY,
-    title: "Soberania e Diplomacia",
-    description: "A arte da governação e resistência ancestral angolana.",
-    icon: "award",
-    color: "border-amber-500",
+    id: ModuleType.CIVICS,
+    title: "Soberania e Direito",
+    description: "Análise profunda da CRA e direitos fundamentais.",
+    icon: "shield",
+    color: "border-indigo-500",
     lessons: [
       {
-        id: 'hist-l1',
-        title: "Njinga: Protocolo de Elite",
-        description: "Diplomacia luso-africana no século XVII.",
-        content: "A Rainha Njinga Mbandi era uma mestre da 'Realpolitik'. Ela dominava o protocolo diplomático para manter a soberania do Ndongo. Em 1622, na conferência de Luanda, ela demonstrou igualdade de estatuto ao exigir tratamento de monarca perante o governador português, utilizando táticas de negociação que são estudadas hoje como exemplos de diplomacia de alta pressão.",
+        id: 'civ-l1',
+        title: "O Código Fonte da Nação",
+        description: "Hierarquia jurídica e soberania popular na CRA.",
+        content: "A Constituição da República de Angola (CRA) não é apenas um livro de leis; é o código fonte que define como o nosso 'sistema operacional' nacional deve funcionar. Ela garante que o poder reside no povo e protege a dignidade de cada cidadão angolano.",
         imageUrl: "",
-        quizzes: []
-      },
-      {
-        id: 'hist-l2',
-        title: "Estrutura do Reino do Kongo",
-        description: "Administração centralizada e economia fiduciária.",
-        content: "O Reino do Kongo possuía uma administração centralizada altamente eficiente. O Nzimbo (moeda) era controlado pelo Manikongo, permitindo uma economia estável que facilitava o comércio de sal, tecidos e metais por toda a África Central, muito antes da introdução de sistemas bancários europeus.",
-        imageUrl: "",
-        quizzes: []
+        quizzes: [
+          {
+            id: 'q-civ-1',
+            discipline: 'Direito Constitucional',
+            theme: 'Soberania',
+            contextIntro: 'Análise do Artigo 3.º da CRA.',
+            question: "De acordo com o protocolo fundamental, onde reside a soberania de Angola?",
+            options: [
+              { id: 'a', text: 'No Governo Central', isCorrect: false },
+              { id: 'b', text: 'No Povo Angolano', isCorrect: true },
+              { id: 'c', text: 'Nas Forças de Defesa', isCorrect: false }
+            ],
+            interactionType: InteractionType.MULTIPLE_CHOICE,
+            explanation: "O Artigo 3.º estabelece que a soberania reside no povo, que a exerce através do sufrágio e das instituições democráticas.",
+            difficulty: Difficulty.ASPIRANTE,
+            hint: "Consulta o Artigo 3.º"
+          }
+        ]
       }
     ]
   },
   {
     id: ModuleType.ROBOTICS,
-    title: "Sistemas Orbitais",
-    description: "Engenharia aeroespacial e o futuro do AngoSat-2.",
+    title: "Hardware & Satélites",
+    description: "Engenharia de semicondutores e o AngoSat.",
     icon: "rocket",
-    color: "border-indigo-400",
+    color: "border-cyan-500",
     lessons: [
       {
         id: 'rob-l1',
-        title: "Física do AngoSat-2",
-        description: "Transponders e Órbita Geoestacionária.",
-        content: "O AngoSat-2 opera a 36.000 km de altitude. Ele utiliza transponders em Banda Ku e Banda C para converter sinais de rádio. A física envolvida exige precisão milimétrica na correção de órbita, usando propulsão elétrica iónica para manter o satélite exatamente sobre o território angolano.",
-        imageUrl: "",
-        quizzes: []
-      },
-      {
-        id: 'rob-l2',
-        title: "Semicondutores",
-        description: "A base da computação moderna.",
-        content: "Robôs e satélites dependem de semicondutores. O Silício, quando dopado com outros elementos, permite controlar o fluxo de eletrões (corrente elétrica). Entender a junção P-N é fundamental para criar processadores que movem desde drones até os supercomputadores da Nkelo.",
+        title: "Arquitetura Orbital",
+        description: "Como o AngoSat-2 comunica com o solo.",
+        content: "Para que Angola tenha internet em todo o território, usamos satélites como o AngoSat-2. Eles utilizam microchips de silício altamente avançados que processam milhões de sinais por segundo para nos manter conectados.",
         imageUrl: "",
         quizzes: []
       }
     ]
+  }
+];
+
+// Mock data for the digital library featured in the Archive screen
+export const DIGITAL_LIBRARY: DigitalBook[] = [
+  {
+    id: 'b1',
+    title: 'Constituição da República de Angola',
+    category: 'Direito',
+    author: 'Assembleia Nacional',
+    icon: 'shield',
+    levelRequired: 1,
+    summary: 'A Lei Fundamental que define a organização política e os direitos dos cidadãos angolanos.',
+    fullText: 'Angola é uma República soberana e independente, baseada na dignidade da pessoa humana e na vontade do povo angolano. A soberania reside no povo, que a exerce através do sufrágio universal e das instituições democráticas. O Estado respeita e protege a pessoa humana, os seus direitos e liberdades fundamentais, garantindo a paz, a democracia e o progresso social.',
+    isLegal: true
   },
   {
-    id: ModuleType.PHYSICS,
-    title: "Energia e Matéria",
-    description: "Termodinâmica e Física Quântica aplicada.",
-    icon: "zap",
-    color: "border-rose-400",
-    lessons: [
-      {
-        id: 'phy-l1',
-        title: "Efeito Fotoelétrico no Namibe",
-        description: "Transformando fotões em eletrões.",
-        content: "A energia solar funciona através do Efeito Fotoelétrico. No deserto do Namibe, a radiação solar intensa atinge os painéis de silício, libertando eletrões que geram energia limpa. Esta é a aplicação direta da física quântica para resolver o problema energético nacional.",
-        imageUrl: "",
-        quizzes: []
-      }
-    ]
+    id: 'b2',
+    title: 'Princípios do AngoSat-2',
+    category: 'Tecnologia',
+    author: 'GGPEN',
+    icon: 'rocket',
+    levelRequired: 3,
+    summary: 'Exploração técnica do primeiro satélite de comunicações de fabrico nacional.',
+    fullText: 'O AngoSat-2 é um satélite de comunicações geoestacionário que opera nas bandas C e Ku. Ele foi concebido para fornecer serviços de telecomunicações, internet de alta velocidade e transmissão de dados em todo o território nacional e partes da região da SADC, contribuindo para a inclusão digital e soberania tecnológica de Angola.',
+    isLegal: false
   },
   {
-    id: ModuleType.BIOLOGY,
-    title: "Biosfera Angola",
-    description: "Genética e ecossistemas estratégicos.",
-    icon: "activity",
-    color: "border-emerald-500",
-    lessons: [
-      {
-        id: 'bio-l1',
-        title: "DNA da Palanca Negra",
-        description: "Conservação genética de elite.",
-        content: "A Palanca Negra Gigante é um tesouro genético. Biólogos angolanos utilizam marcadores de DNA para monitorizar a diversidade da espécie no Parque de Cangandala, garantindo que a subespécie sobreviva a doenças e mantenha a sua robustez física única.",
-        imageUrl: "",
-        quizzes: []
-      }
-    ]
+    id: 'b3',
+    title: 'Guia de Robótica Nkelo',
+    category: 'Engenharia',
+    author: 'Equipa Nkelo',
+    icon: 'zap',
+    levelRequired: 5,
+    summary: 'Manual avançado para construção de sistemas autónomos no contexto angolano.',
+    fullText: 'A robótica em Angola está em ascensão. Este guia detalha o uso de microcontroladores e sensores para criar soluções locais, desde agricultura inteligente até monitorização ambiental. Aprender robótica é dominar as ferramentas que construirão as infraestruturas do futuro da nossa nação.',
+    isLegal: false
   }
 ];
